@@ -1,0 +1,99 @@
+name: orders-debezium-connector
+
+volumes:
+  kafka-1-data:
+  kafka-2-data:
+  kafka-3-data:
+
+
+networks:
+  kafka-net:
+
+
+services:
+
+  x-kafka-common: &kafka-common
+    image: bitnami/kafka:4.0.0
+    environment: &kafka-common-env
+      KAFKA_CLUSTER_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: BROKER
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: BROKER:PLAINTEXT,CONTROLLER:PLAINTEXT,CLIENT:PLAINTEXT
+      KAFKA_CFG_LISTENERS: BROKER://:9092,CONTROLLER://:9093,CLIENT://:9094
+      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: false
+    networks:
+      - kafka-net
+    healthcheck:
+      test: kafka-cluster.sh cluster-id --bootstrap-server localhost:9092 || exit 1
+      interval: 1s
+      timeout: 5s
+      retries: 60
+    
+
+  kafka-1:
+    <<: *kafka-common
+    container_name: kafka-1
+    hostname: kafka-1
+    volumes:
+      - kafka-1-data:/bitnami/kafka
+    ports:
+      - "127.0.0.1:19094:9094"
+    environment:
+      <<: *kafka-common-env
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_ADVERTISED_LISTENERS: BROKER://kafka-1:9092,CLIENT://127.0.0.1:19094
+    networks:
+      - kafka-net
+    healthcheck:
+      test: kafka-cluster.sh cluster-id --bootstrap-server localhost:9092 || exit 1
+      interval: 1s
+      timeout: 10s
+      retries: 60
+
+  kafka-2:
+    <<: *kafka-common
+    container_name: kafka-2
+    hostname: kafka-2
+    volumes:
+      - kafka-2-data:/bitnami/kafka
+    ports:
+      - "127.0.0.1:29094:9094"
+    environment:
+      <<: *kafka-common-env
+      KAFKA_CFG_NODE_ID: 2
+      KAFKA_CFG_ADVERTISED_LISTENERS: BROKER://kafka-2:9092,CLIENT://127.0.0.1:29094
+
+  kafka-3:
+    <<: *kafka-common
+    container_name: kafka-3
+    hostname: kafka-3
+    volumes:
+      - kafka-3-data:/bitnami/kafka
+    ports:
+      - "127.0.0.1:39094:9094"
+    environment:
+      <<: *kafka-common-env
+      KAFKA_CFG_NODE_ID: 3
+      KAFKA_CFG_ADVERTISED_LISTENERS: BROKER://kafka-3:9092,CLIENT://127.0.0.1:39094
+
+  ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    hostname: kafka-ui
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - KAFKA_CLUSTERS_0_NAME=kraft_cluster_1
+    networks:
+      - kafka-net
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy

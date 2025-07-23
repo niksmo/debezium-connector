@@ -14,7 +14,7 @@
 
 ```
 git clone git@github.com:niksmo/debezium-connector.git
-cd messaging
+cd debezium-connector
 go mod download
 ```
 
@@ -49,7 +49,7 @@ curl -X PUT -H 'Content-Type: application/json' --data @infra/pg-connector.json 
 
 Первый терминал
 ```
-./bin/inserter
+./bin/inserter -dsn postgres-user:postgres-pw@127.0.0.1:5432/customers
 ```
 
 Второй терминал

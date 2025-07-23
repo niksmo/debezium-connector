@@ -4,6 +4,7 @@ volumes:
   kafka-1-data:
   kafka-2-data:
   kafka-3-data:
+  pg-data:
   pg-admin-data:
 
 networks:
@@ -174,6 +175,7 @@ services:
       POSTGRES_PASSWORD: postgres-pw
       POSTGRES_DB: customers
     volumes:
+      - pg-data:/var/lib/postgresql/data
       - ./infra/postgres/custom-config.conf:/etc/postgresql/postgresql.conf
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
     networks:

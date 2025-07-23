@@ -2,7 +2,7 @@ package consumer
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/niksmo/kafka-connect-practice/pkg/logger"
@@ -71,19 +71,7 @@ func (c Consumer) readMessages(ch chan<- any) {
 func (c Consumer) handleMsg(msg any) {
 	switch m := msg.(type) {
 	case *kafka.Message:
-		var v map[string]any
-		if err := json.Unmarshal(m.Value, &v); err != nil {
-			c.logger.Error().Err(err).Msg("failed to unmarshal message value")
-			return
-		}
-
-		payload, ok := v["payload"]
-		if !ok {
-			c.logger.Info().Msg("message without payload")
-			return
-		}
-
-		c.logger.Info().Any("payload", payload).Msg("receive message")
+		fmt.Println(string(m.Value))
 	case error:
 		c.logger.Error().Err(m).Msg("receive erorr")
 	default:

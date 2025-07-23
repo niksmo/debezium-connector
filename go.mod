@@ -2,7 +2,10 @@ module github.com/niksmo/kafka-connect-practice
 
 go 1.24.4
 
-require github.com/rs/zerolog v1.34.0
+require (
+	github.com/jackc/pgx/v5 v5.5.4
+	github.com/rs/zerolog v1.34.0
+)
 
 require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -10,7 +13,6 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
-	github.com/jackc/pgx/v5 v5.5.4 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect

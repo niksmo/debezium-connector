@@ -43,7 +43,7 @@ func main() {
 }
 
 func getFlagsValues() (dsn, mPath string) {
-	storagePath := flag.String("dsn", "", "set user:password@host:port")
+	storagePath := flag.String("dsn", "", "set user:password@host:port/dbname")
 	migrationsPath := flag.String("m", "", "set migration path")
 	flag.Parse()
 	return *storagePath, *migrationsPath
@@ -72,7 +72,7 @@ func makeMigrations(
 ) {
 	m, err := migrate.New(
 		fmt.Sprintf("file://%s", migrationsPath),
-		fmt.Sprintf("pgx5://%s/customers", storagePath),
+		fmt.Sprintf("pgx5://%s", storagePath),
 	)
 	if err != nil {
 		logger.logger.Fatal().Err(err).Send()

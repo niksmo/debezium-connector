@@ -71,10 +71,13 @@ func runConsumers(ctx context.Context,
 	wg *sync.WaitGroup, consumers []consumer.Consumer) {
 	for _, c := range consumers {
 		wg.Add(1)
-		go func() {
-			c.MustRun(ctx)
-			defer wg.Done()
-			defer c.Close()
-		}()
+		go runConsumer(ctx, wg, c)
 	}
+}
+
+func runConsumer(ctx context.Context,
+	wg *sync.WaitGroup, c consumer.Consumer) {
+	c.MustRun(ctx)
+	defer wg.Done()
+	defer c.Close()
 }

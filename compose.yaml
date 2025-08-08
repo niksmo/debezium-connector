@@ -1,14 +1,14 @@
-name: orders-debezium-connector
+name: debezium-customers
 
 volumes:
   kafka-1-data:
   kafka-2-data:
   kafka-3-data:
-
+  pg-data:
+  pg-admin-data:
 
 networks:
   kafka-net:
-
 
 services:
 
@@ -32,7 +32,6 @@ services:
       timeout: 5s
       retries: 60
     
-
   kafka-1:
     <<: *kafka-common
     container_name: kafka-1
@@ -40,7 +39,7 @@ services:
     volumes:
       - kafka-1-data:/bitnami/kafka
     ports:
-      - "127.0.0.1:19094:9094"
+      - 127.0.0.1:19094:9094
     environment:
       <<: *kafka-common-env
       KAFKA_CFG_NODE_ID: 1
@@ -60,7 +59,7 @@ services:
     volumes:
       - kafka-2-data:/bitnami/kafka
     ports:
-      - "127.0.0.1:29094:9094"
+      - 127.0.0.1:29094:9094
     environment:
       <<: *kafka-common-env
       KAFKA_CFG_NODE_ID: 2
@@ -73,18 +72,63 @@ services:
     volumes:
       - kafka-3-data:/bitnami/kafka
     ports:
-      - "127.0.0.1:39094:9094"
+      - 127.0.0.1:39094:9094
     environment:
       <<: *kafka-common-env
       KAFKA_CFG_NODE_ID: 3
       KAFKA_CFG_ADVERTISED_LISTENERS: BROKER://kafka-3:9092,CLIENT://127.0.0.1:39094
+
+  kafka-connect:
+    build:
+      context: ./infra/kafka-connect
+    container_name: kafka-connect
+    ports:
+      - 127.0.0.1:8083:8083  # REST API Kafka Connect
+      - 127.0.0.1:9875:9875
+      - 127.0.0.1:9876:9876
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: 'kafka-connect'
+      CONNECT_REST_ADVERTISED_HOST_NAME: 'localhost'
+      # Хранение конфигурации, смещений и статусов
+      CONNECT_CONFIG_STORAGE_TOPIC: 'connect-config-storage'
+      CONNECT_OFFSET_STORAGE_TOPIC: 'connect-offset-storage'
+      CONNECT_STATUS_STORAGE_TOPIC: 'connect-status-storage'
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      # Конвертеры
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      # Export JMX metrics to :9876/metrics for Prometheus
+      KAFKA_JMX_PORT: 9875
+      KAFKA_OPTS: "-javaagent:/opt/jmx_prometheus_javaagent-0.15.0.jar=9876:/opt/kafka-connect.yml"
+      # Read connection password from file
+      CONNECT_CONFIG_PROVIDERS: "file"
+      CONNECT_CONFIG_PROVIDERS_FILE_CLASS: "org.apache.kafka.common.config.provider.FileConfigProvider"  
+      # Пути к плагинам
+      CONNECT_PLUGIN_PATH: /usr/share/java,/etc/kafka-connect/jars
+    volumes:
+      - ./infra/confluent-hub-components/:/etc/kafka-connect/jars
+    networks:
+      - kafka-net
 
   ui:
     image: provectuslabs/kafka-ui:v0.7.2
     container_name: kafka-ui
     hostname: kafka-ui
     ports:
-      - "127.0.0.1:8080:8080"
+      - 127.0.0.1:8080:8080
     environment:
       - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
       - KAFKA_CLUSTERS_0_NAME=kraft_cluster_1
@@ -97,3 +141,55 @@ services:
         condition: service_healthy
       kafka-3:
         condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.30.3
+    container_name: prometheus
+    ports:
+      - 127.0.0.1:9090:9090
+    volumes:
+      - ./infra/prometheus:/etc/prometheus
+    command: --web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml
+    links:
+      - kafka-connect
+    networks:
+      - kafka-net
+
+  grafana:
+    build:
+      context: ./infra/grafana
+    container_name: grafana
+    ports:
+      - 127.0.0.1:3000:3000
+    networks:
+      - kafka-net
+
+  postgres:
+    image: debezium/postgres:16
+    hostname: postgres
+    container_name: postgres
+    ports:
+      - 127.0.0.1:5432:5432
+    environment:
+      POSTGRES_USER: postgres-user
+      POSTGRES_PASSWORD: postgres-pw
+      POSTGRES_DB: customers
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./infra/postgres/custom-config.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - kafka-net
+
+  pg-admin:
+    image: dpage/pgadmin4:9.5
+    container_name: pg-admin
+    ports:
+      - 127.0.0.1:8000:80
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@email.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    volumes:
+      - pg-admin-data:/var/lib/pgadmin
+    networks:
+      - kafka-net
